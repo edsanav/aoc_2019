@@ -7,8 +7,6 @@ import scala.io.Source
 
 object Main extends App {
 
-
-  val input1:List[Int] = Source.fromResource("inputs/day1.csv").getLines.map(_.toInt).toList
-
-  println(compute_fuel(total_fuel(input1)))
+  println("Day1", day1.run())
+  println("Day2-a", day2.run())
 }
