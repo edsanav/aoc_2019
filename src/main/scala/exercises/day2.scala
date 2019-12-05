@@ -1,11 +1,9 @@
 package exercises
 
-import exercises.day2.Multiplication
-
 import scala.io.Source
 
 
-object day2 {
+object day2 extends App{
 
   def readInput(file:String):Vector[Int] = {
     val lines = Source.fromResource(file).getLines()
@@ -56,12 +54,15 @@ object day2 {
     } yield (x,y, compute(x, y, v))
   }
 
-  def run() = {
-    val rawV = readInput("inputs/day2.csv")
+  def run(input_file:String):Int = {
+    val rawV = readInput(input_file)
     //compute(12, 2, rawV)
     val (noun, verb, _) = findCombination(rawV).find( x => x._3 == 19690720).get
     (noun*100 + verb)
   }
 
+  val result = run(args.headOption.getOrElse("inputs/day2.csv"))
+
+  println(s"Day2: $result")
 
 }

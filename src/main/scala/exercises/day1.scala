@@ -1,8 +1,9 @@
 package exercises
 
+
 import scala.io.Source
 
-object day1 {
+object day1 extends App {
 
   def fuelFormula(w: Int): Int = (w / 3) - 2
 
@@ -23,7 +24,11 @@ object day1 {
     weights.map(computeFuel).sum
   }
 
-  def run():Int =  totalFuel(readFile("inputs/day1.csv"))
+  def run(input_file:String):Int =  totalFuel(readFile(input_file))
+
+  val result = run(args.headOption.getOrElse("inputs/day1.csv"))
+
+  println(s"Day1: $result")
 
 }
 
