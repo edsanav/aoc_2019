@@ -2,6 +2,8 @@ package exercises
 
 import scala.io.Source
 import Math.{max, min}
+
+import scala.annotation.tailrec
 object day3 extends App {
 
   type Cable = List[Line]
@@ -49,6 +51,7 @@ object day3 extends App {
     val p2:Point
 
     def crossPoint(l:Line):Option[Point]
+    def goesThroughPoint(p:Point):Option[Int]
   }
 
   case class Horizontal(p1:Point, p2:Point) extends Line{
@@ -64,7 +67,11 @@ object day3 extends App {
       case l:Vertical if (minX <= l.x  &&  l.x <= maxX) && (l.minY <= y  &&  y <= l.maxY) => Some(Point(l.x, y))
       case _ => None
     }
-
+    
+    def goesThroughPoint(p:Point): Option[Int] = {
+      if (y ==p.y && minX <= p.x && p.x <=maxX) Some(Math.abs(p.x - x1))
+      else None
+    }
   }
   // Alternate constructor
   object Horizontal{
@@ -83,6 +90,12 @@ object day3 extends App {
       case l:Horizontal if (minY <= l.y  &&  l.y <= maxY) && (l.minX <= x  &&  x <= l.maxX) => Some(Point(x, l.y))
       case _ => None
     }
+    
+    def goesThroughPoint(p:Point):Option[Int] = {
+      if (x ==p.x && minY <= p.y && p.y <=maxY)  Some(Math.abs(p.y - y1))
+      else None
+    }
+    
   }
 
   object Vertical{
@@ -109,16 +122,55 @@ object day3 extends App {
     l.tail.foldLeft(l.head)((closest,point) => if (point.distance < closest.distance) point else closest)
   }
 
-
-  def run(input_file:String):Int = {
-    val cables:List[Cable] = readMoves(input_file).map(movesToCable(_))
-    val cableA:Cable = cables.head
-    val cableB:Cable = cables.tail.head
-    closestPoint(crossPoints(cableA, cableB)).distance
+  @tailrec
+  def movesToPoints(orig:Point, moves:List[Move], pointsMap:Map[Point, Option[Int]], steps:Int):Map[Point, Option[Int]] = {
+    moves match {
+      case Nil => pointsMap
+      case m::ms => {
+        val nextLine:Line = orig.move(m)
+        val newPointMap:Map[Point, Option[Int]] = {
+          pointsMap.keys.foldLeft(Map[Point, Option[Int]]()){
+            // If goes through the point, gets the total steps and adds the value to that point
+            (m, p) => {
+              if (pointsMap(p).nonEmpty) m + (p->pointsMap(p))
+              else m + (p->nextLine.goesThroughPoint(p).map(steps+_))
+            }}
+        }
+        movesToPoints(nextLine.p2, ms, newPointMap, steps+m.positions)
+      }
+    }
   }
 
-  val result = run(args.headOption.getOrElse("inputs/day3.csv"))
-  println( println(s"Day3: $result")
-  )
+
+  def run(input_file:String):(Int,Int) = {
+    val allMoves = readMoves(input_file)
+    val movesA:List[Move] = allMoves.head
+    val movesB:List[Move] = allMoves.tail.head
+    val cables:List[Cable] = allMoves.map(movesToCable(_))
+    val cableA:Cable = cables.head
+    val cableB:Cable = cables.tail.head
+    val crosses:List[Point] = crossPoints(cableA, cableB)
+
+    val stepsA = movesToPoints(Point(0,0), movesA, crosses.map((_, None)).toMap, steps=0)
+    val stepsB = movesToPoints(Point(0,0), movesB, crosses.map((_, None)).toMap, steps=0)
+
+    val shortesCross:Int = {
+      stepsA.keys.tail.foldLeft(stepsA(stepsA.keys.head).get + stepsB(stepsA.keys.head).get)(
+        (closest, k) => {
+          val nextVal = stepsA(k).get + stepsB(k).get
+          if (nextVal<closest) nextVal
+          else closest
+        }
+      )
+    }
+    (closestPoint(crosses).distance, shortesCross)
+
+  }
+
+
+  val (result1, result2) = run(args.headOption.getOrElse("inputs/day3.csv"))
+  println(s"Day3: $result1")
+  println(s"Day3: $result2")
+
 
 }
