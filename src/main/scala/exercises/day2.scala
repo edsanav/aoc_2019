@@ -1,5 +1,6 @@
 package exercises
 
+import scala.annotation.tailrec
 import scala.io.Source
 
 
@@ -34,6 +35,7 @@ object day2 extends App{
     else throw new IllegalArgumentException("Invalid operation")
   }
 
+  @tailrec
   def operation(v:Vector[Int], cursor:Int):(Vector[Int], Int) = {
     translate(v, cursor) match {
       case End => (v, cursor)
@@ -54,15 +56,16 @@ object day2 extends App{
     } yield (x,y, compute(x, y, v))
   }
 
-  def run(input_file:String):Int = {
+  def run(input_file:String):(Int,Int) = {
     val rawV = readInput(input_file)
-    //compute(12, 2, rawV)
+    val part1 = compute(12, 2, rawV)
     val (noun, verb, _) = findCombination(rawV).find( x => x._3 == 19690720).get
-    (noun*100 + verb)
+    val part2 = (noun*100 + verb)
+    (part1, part2)
   }
 
-  val result = run(args.headOption.getOrElse("inputs/day2.csv"))
-
-  println(s"Day2: $result")
+  val (result1, result2) = run(args.headOption.getOrElse("inputs/day2.csv"))
+  println(s"Day2-1: $result1")
+  println(s"Day2-2: $result2")
 
 }

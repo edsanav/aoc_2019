@@ -24,11 +24,15 @@ object day1 extends App {
     weights.map(computeFuel).sum
   }
 
-  def run(input_file:String):Int =  totalFuel(readFile(input_file))
+  def run(input_file:String):(Int,Int) =  {
+    val weights = readFile(input_file)
+    (weights.map(fuelFormula).sum, totalFuel(weights))
+  }
 
-  val result = run(args.headOption.getOrElse("inputs/day1.csv"))
+  val (result1,result2) = run(args.headOption.getOrElse("inputs/day1.csv"))
 
-  println(s"Day1: $result")
+  println(s"Day1-1: $result1")
+  println(s"Day1-2: $result2")
 
 }
 

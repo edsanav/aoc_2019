@@ -42,6 +42,6 @@ object day4 extends App {
   }
 
   val (result1, result2) = run( (165432,707912))
-  println(s"Day4: $result1")
-  println(s"Day4: $result2")
+  println(s"Day4-1: $result1")
+  println(s"Day4-2: $result2")
 }

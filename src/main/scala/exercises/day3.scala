@@ -169,8 +169,8 @@ object day3 extends App {
 
 
   val (result1, result2) = run(args.headOption.getOrElse("inputs/day3.csv"))
-  println(s"Day3: $result1")
-  println(s"Day3: $result2")
+  println(s"Day3-1: $result1")
+  println(s"Day3-2: $result2")
 
 
 }
