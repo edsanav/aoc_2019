@@ -6,9 +6,11 @@ import scala.io.Source
 
 object day2 extends App{
 
+  def csvToVector(csv:String):Vector[Int] = csv.split(",").map(_.toInt).toVector
+
   def readInput(file:String):Vector[Int] = {
     val lines = Source.fromResource(file).getLines()
-    if(lines.hasNext) lines.next.split(",").map(_.toInt).toVector else Vector[Int]()
+    if(lines.hasNext) csvToVector(lines.next) else Vector[Int]()
   }
 
   def readUserInput():Int = {
@@ -56,23 +58,35 @@ object day2 extends App{
   }
 
   case class JumpIfTrue(v:Vector[Int], p1:ReadParam, p2:ReadParam) extends Action {
-    def execute:Vector[Int]  = ???
-    def nextCursor(cursor:Int):Int = cursor + 3 //CAREFUL!
+    def execute:Vector[Int]  = v
+    def nextCursor(cursor:Int):Int = {
+      if (p1(v)!=0) p2(v)
+      else cursor + 3
+    }
   }
 
   case class JumpIfFalse(v:Vector[Int], p1:ReadParam, p2:ReadParam) extends Action {
-    def execute:Vector[Int]  = ???
-    def nextCursor(cursor:Int):Int = cursor + 2
+    def execute:Vector[Int]  = v
+    def nextCursor(cursor:Int):Int = {
+      if (p1(v)==0) p2(v)
+      else cursor + 3
+    }
   }
 
-  case class LessThan(v:Vector[Int], p1:ReadParam, p2:ReadParam) extends Action {
-    def execute:Vector[Int]  = ???
-    def nextCursor(cursor:Int):Int = cursor + 2
+  case class LessThan(v:Vector[Int], p1:ReadParam, p2:ReadParam, result:Int) extends Action {
+    def execute:Vector[Int]  = {
+      val toStore = if (p1(v) < p2(v)) 1 else 0
+       v updated(result, toStore)
+    }
+    def nextCursor(cursor:Int):Int = cursor + 4
   }
 
-  case class Equals(v:Vector[Int], p1:ReadParam, p2:ReadParam) extends Action {
-    def execute:Vector[Int]  = ???
-    def nextCursor(cursor:Int):Int = cursor + 2
+  case class Equals(v:Vector[Int], p1:ReadParam, p2:ReadParam, result:Int) extends Action {
+    def execute:Vector[Int]  = {
+      val toStore = if (p1(v) == p2(v)) 1 else 0
+      v updated(result, toStore)
+    }
+    def nextCursor(cursor:Int):Int = cursor + 4
   }
 
   case object End extends Operation
@@ -92,7 +106,10 @@ object day2 extends App{
     else if (op == 2) Multiplication(v, rpF(1),  rpF(2), v(cursor+3))
     else if (op == 3) InputAction(v, v(cursor+1))
     else if (op == 4) OutputAction(v, rpF(1))
-    else if (op == 5) OutputAction(v, rpF(1))
+    else if (op == 5) JumpIfTrue(v, rpF(1), rpF(2))
+    else if (op == 6) JumpIfFalse(v, rpF(1), rpF(2))
+    else if (op == 7) LessThan(v, rpF(1), rpF(2), v(cursor+3))
+    else if (op == 8) Equals(v, rpF(1), rpF(2), v(cursor+3))
     else if (op == 99) End
     else throw new IllegalArgumentException("Invalid operation")
   }

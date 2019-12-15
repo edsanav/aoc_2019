@@ -7,7 +7,8 @@ object day5 extends App {
 
   def run(input_file:String):(Int,Int) = {
     val rawV = readInput(input_file)
-    operation(rawV, 0)
+//    val firstRun = operation(rawV, 0)
+    val secondRun = operation(rawV, 0)
     (0,0)
   }
 
