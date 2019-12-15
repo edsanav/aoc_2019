@@ -1,11 +1,14 @@
 package exercises
 
+import exercises.day2._
+
 
 object day5 extends App {
 
-
   def run(input_file:String):(Int,Int) = {
-    ???
+    val rawV = readInput(input_file)
+    operation(rawV, 0)
+    (0,0)
   }
 
 
