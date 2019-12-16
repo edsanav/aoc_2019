@@ -4,12 +4,10 @@ import scala.io.Source
 
 object day6 extends App{
 
-  case class Planet(code:String, orbiters:Set[Planet]){
+  case class Planet(code:String, orbiters:Set[Planet], distance:Int=0){
 
-    def orbits(step:Int):Int = orbiters.size * step
-    val checkSum= {
-      val toSum = orbiters.foldLeft(List((orbiters.size * 1, 1))((total, x) => List((orbiters.size, * total._2 +1)
-    }
+
+    val checkSum:Int = orbiters.foldLeft(distance)((accum, x)=> accum + x.checkSum)
   }
 
   def splitOrbit(orbitStr:String):(String, String) = {
@@ -28,21 +26,16 @@ object day6 extends App{
   }
 
 
-  def toPlanet(code:String, orbitMap:HashMap[String, Set[String]]):Planet = {
-    Planet(code, orbitMap(code).foldLeft(Set[Planet]())((total, x)=> total + toPlanet(x, orbitMap)))
+  def toPlanet(code:String, orbitMap:HashMap[String, Set[String]], distance:Int=0):Planet = {
+    Planet(code, orbitMap(code).foldLeft(Set[Planet]())((total, x)=> total + toPlanet(x, orbitMap, distance+1)), distance)
   }
 
   def run(input_file:String):(Int,Int) = {
     val orbitMap = organizeOrbits(Source.fromResource(input_file).getLines)
     val wholeSystem = toPlanet("COM", orbitMap)
-    val in2 = Iterator("COM)B", "B)C", "C)D","D)E","E)F","B)G","G)H","D)I","E)J","J)K","K)L")
-    val orbitMap2 = organizeOrbits(in2)
-    val sample =  toPlanet("COM", orbitMap2)
-    println(sample.checkSum)
-    println(sample)
-
     (wholeSystem.checkSum, 0)
   }
+
 
 
   val (result1, result2) = run(args.headOption.getOrElse("inputs/day6.csv"))
