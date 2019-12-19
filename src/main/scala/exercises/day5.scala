@@ -3,14 +3,16 @@ package exercises
 import exercises.day2._
 import IntcodeComputer._
 
+import scala.collection.immutable.Queue
+
 
 object day5 extends App {
 
   def run(input_file:String):(Int,Int) = {
     val rawV = readInput(input_file)
-    val firstRun = operation(1)(rawV, 0) // TODO fix output? write to somewhere?
-    val secondRun = operation(5)(rawV, 0)
-    (0,0)
+    val firstRun = operation(1)(Queue[Int]())(rawV, 0)
+    val secondRun = operation(5)(Queue[Int]())(rawV, 0)
+    (firstRun._3.last,secondRun._3.last)
   }
 
 

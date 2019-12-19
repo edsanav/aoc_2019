@@ -1,10 +1,12 @@
 package exercises
 
 import scala.annotation.tailrec
+import scala.collection.immutable.Queue
 
 object IntcodeComputer {
+  //TODO refactor?
 
-
+  type Result = Queue[Int] => (Vector[Int], Queue[Int]) // State?
   type ReadParam = Vector[Int] => Int
 
   def positional(p:Int): ReadParam = (v:Vector[Int]) => v(p)
@@ -13,37 +15,37 @@ object IntcodeComputer {
   sealed trait Operation
 
   trait Action extends Operation {
-    def execute:Vector[Int]
+    def execute: Queue[Int] => (Vector[Int], Queue[Int])// probably can be done better than this
     def nextCursor(cursor:Int): Int
   }
 
   case class Sum(v:Vector[Int], p1: ReadParam, p2: ReadParam, result: Int) extends Action {
-    def execute:Vector[Int]  = v updated(result, p1(v) + p2(v))
+    def execute:Result = (o:Queue[Int]) => (v updated(result, p1(v) + p2(v)), o)
     def nextCursor(cursor:Int):Int = cursor + 4
   }
 
   case class Multiplication(v:Vector[Int], p1: ReadParam, p2: ReadParam, result: Int) extends Action {
-    def execute:Vector[Int]  = v updated(result, p1(v) * p2(v))
+    def execute:Result = (o:Queue[Int]) => (v updated(result, p1(v) * p2(v)), o)
     def nextCursor(cursor:Int):Int = cursor + 4
   }
 
   case class InputAction(v:Vector[Int], result:Int)(intFromInput: =>Int) extends Action {
-    def execute:Vector[Int]   = {
-      v updated(result, intFromInput)
+    def execute:Result = (o:Queue[Int]) =>  {
+      (v updated(result, intFromInput), o)
     }
     def nextCursor(cursor:Int):Int = cursor + 2
   }
 
   case class OutputAction(v:Vector[Int], p1:ReadParam) extends Action {
-    def execute:Vector[Int]  = {
+    def execute:Result = (o:Queue[Int]) =>  {
       println(s"OUTPUT: ${p1(v)}")
-      v
+      (v, o :+ p1(v))
     }
     def nextCursor(cursor:Int):Int = cursor + 2
   }
 
   case class JumpIfTrue(v:Vector[Int], p1:ReadParam, p2:ReadParam) extends Action {
-    def execute:Vector[Int]  = v
+    def execute:Result = (o:Queue[Int]) =>  (v,o)
     def nextCursor(cursor:Int):Int = {
       if (p1(v)!=0) p2(v)
       else cursor + 3
@@ -51,7 +53,7 @@ object IntcodeComputer {
   }
 
   case class JumpIfFalse(v:Vector[Int], p1:ReadParam, p2:ReadParam) extends Action {
-    def execute:Vector[Int]  = v
+    def execute:Result = (o:Queue[Int]) =>  (v,o)
     def nextCursor(cursor:Int):Int = {
       if (p1(v)==0) p2(v)
       else cursor + 3
@@ -59,17 +61,17 @@ object IntcodeComputer {
   }
 
   case class LessThan(v:Vector[Int], p1:ReadParam, p2:ReadParam, result:Int) extends Action {
-    def execute:Vector[Int]  = {
+    def execute:Result = (o:Queue[Int]) => {
       val toStore = if (p1(v) < p2(v)) 1 else 0
-      v updated(result, toStore)
+      (v updated(result, toStore), o)
     }
     def nextCursor(cursor:Int):Int = cursor + 4
   }
 
   case class Equals(v:Vector[Int], p1:ReadParam, p2:ReadParam, result:Int) extends Action {
-    def execute:Vector[Int]  = {
+    def execute:Result = (o:Queue[Int]) => {
       val toStore = if (p1(v) == p2(v)) 1 else 0
-      v updated(result, toStore)
+      (v updated(result, toStore),o)
     }
     def nextCursor(cursor:Int):Int = cursor + 4
   }
@@ -102,10 +104,13 @@ object IntcodeComputer {
 
 
   @tailrec
-  def operation(intInput: =>Int)(v:Vector[Int], cursor:Int):(Vector[Int], Int) = {
+  def operation(intInput: =>Int)(output:Queue[Int])(v:Vector[Int], cursor:Int):(Vector[Int], Int, Queue[Int]) = {
     translate(intInput)(v, cursor) match {
-      case End => (v, cursor)
-      case op:Action => operation(intInput)(op.execute, op.nextCursor(cursor))
+      case End => (v, cursor, output)
+      case op:Action => {
+        val (newV, out2) = op.execute(output)
+        operation(intInput)(out2)(newV, op.nextCursor(cursor))
+      }
     }
   }
 
@@ -116,7 +121,10 @@ object IntcodeComputer {
   }
 
   def operationFromUserInput:(Vector[Int], Int) => (Vector[Int], Int) = {
-    operation(readUserInput())
+    (v:Vector[Int],c:Int) => {
+      val (v2, c2, o) = operation(readUserInput())(Queue[Int]())(v, c)
+      (v2,c2)
+    }
   }
 
 
