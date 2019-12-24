@@ -29,8 +29,9 @@ object IntcodeComputer {
     def nextCursor(cursor:Int):Int = cursor + 4
   }
 
-  case class InputAction(v:Vector[Int], result:Int)(intFromInput: =>Int) extends Action {
+  case class InputAction[A](v:Vector[Int], result:Int)(intFromInput:A=>(Int,A)) extends Action {
     def execute:Result = (o:Queue[Int]) =>  {
+      val valFromIn = intFromInput
       (v updated(result, intFromInput), o)
     }
     def nextCursor(cursor:Int):Int = cursor + 2
@@ -85,13 +86,13 @@ object IntcodeComputer {
     else positional(v(cursor+opCursor))
   }
 
-  def translate(input: =>Int)(v:Vector[Int], cursor:Int):Operation = {
+  def translate[A](in:A => (Int,A))(v:Vector[Int], cursor:Int):Operation = {
     val opCode = v(cursor)
     val op:Int = opCode % 100
     def rpF:Int => ReadParam = getReadParam(v, cursor)(opCode) // partially applied f to get ReadParam from opCursor
     if (op == 1) Sum(v, rpF(1),  rpF(2), v(cursor+3))
     else if (op == 2) Multiplication(v, rpF(1),  rpF(2), v(cursor+3))
-    else if (op == 3) InputAction(v, v(cursor+1))(input)
+    else if (op == 3) InputAction(v, v(cursor+1))(in)
     else if (op == 4) OutputAction(v, rpF(1))
     else if (op == 5) JumpIfTrue(v, rpF(1), rpF(2))
     else if (op == 6) JumpIfFalse(v, rpF(1), rpF(2))
@@ -104,12 +105,12 @@ object IntcodeComputer {
 
 
   @tailrec
-  def operation(intInput: =>Int)(output:Queue[Int])(v:Vector[Int], cursor:Int):(Vector[Int], Int, Queue[Int]) = {
-    translate(intInput)(v, cursor) match {
+  def operation[A](in:A => (Int,A))(output:Queue[Int])(v:Vector[Int], cursor:Int):(Vector[Int], Int, Queue[Int]) = {
+    translate(in:A => (Int,A))(v, cursor) match {
       case End => (v, cursor, output)
       case op:Action => {
         val (newV, out2) = op.execute(output)
-        operation(intInput)(out2)(newV, op.nextCursor(cursor))
+        operation(in)(out2)(newV, op.nextCursor(cursor))
       }
     }
   }

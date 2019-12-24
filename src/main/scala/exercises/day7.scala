@@ -1,26 +1,16 @@
 package exercises
 
+import exercises.IntcodeComputer.operation
+
+import scala.collection.immutable.Queue
 import scala.io.BufferedSource
 import scala.io.Source
 
 object day7 extends App{
 
-  def readUserInput():Int = {
-    //This, as the readInput is not very functional. Consider using some libraries (Cats? ZIO?) and cleaning it a bit
-    println("PLEASE, PROVIDE AN INPUT VALUE AND PRESS ENTER")
-    scala.io.StdIn.readInt()
-  }
-
-  def fromStdin() = {
-    io.Source.stdin.bufferedReader()
-  }
-
-  def direct() = {
-
-  }
 
   def run(input_file:String):(Int,Int) = {
-    println(fromStdin().readLine())
+//    val secondRun = operation(5)(Queue[Int]())(rawV, 0)
     (0,0)
   }
 
