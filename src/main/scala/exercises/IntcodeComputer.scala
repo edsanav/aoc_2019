@@ -20,7 +20,11 @@ object IntcodeComputer {
     def execute: Computer => Computer// probably can be done better than this
   }
 
-  trait ChannelAction[A] extends Operation {
+  trait InputAction[A] extends Operation {
+    def execute: (Computer, A) => (Computer, A)
+  }
+
+  trait OutputAction[A] extends Operation {
     def execute: (Computer, A) => (Computer, A)
   }
 
@@ -34,12 +38,12 @@ object IntcodeComputer {
       (c: Computer) => Computer(c.v.updated(result, p1(c.v) * p2(c.v)), c.cursor+4)
   }
 
-  case class ManualInputAction(result:Int) extends ChannelAction[Unit] {
+  case class ManualInputAction(result:Int) extends InputAction[Unit] {
     def execute:(Computer, Unit) => (Computer, Unit) =
       (c: Computer, Unit) => (Computer(c.v.updated(result, readUserInput()), c.cursor+2), Unit)
   }
 
-  case class QueueInputAction(result:Int) extends ChannelAction[Queue[Int]] {
+  case class QueueInputAction(result:Int) extends InputAction[Queue[Int]] {
 
     def execute:(Computer, Queue[Int]) => (Computer, Queue[Int]) =
       (c: Computer, q:Queue[Int]) => {
@@ -49,10 +53,17 @@ object IntcodeComputer {
 
   }
 
-  case class QueueOutputAction(p1:ReadParam) extends ChannelAction[Queue[Int]] {
-    def execute:(Computer, Queue[Int]) => (Computer, Queue[Int]) =
-      (c: Computer, q:Queue[Int]) => (Computer(c.v, c.cursor+2), q:+ p1(v))
+  case class ConsoleOutputAction(p1:ReadParam) extends OutputAction[Unit] {
+    def execute:(Computer, Unit) => (Computer, Unit) =
+      (c: Computer, Unit) => {
+        println(s"CONSOLE OUTPUT:${p1(c.v)}")
+        (Computer(c.v, c.cursor+2), Unit)
+      }
+  }
 
+  case class QueueOutputAction(p1:ReadParam) extends OutputAction[Queue[Int]] {
+    def execute:(Computer, Queue[Int]) => (Computer, Queue[Int]) =
+      (c: Computer, q:Queue[Int]) => (Computer(c.v, c.cursor+2), q:+ p1(c.v))
   }
 
   case class JumpIfTrue(p1:ReadParam, p2:ReadParam) extends Action {
@@ -97,15 +108,14 @@ object IntcodeComputer {
     else positional(v(cursor+opCursor))
   }
 
-  def translate[I,O](intActionFactory:Int => ChannelAction[I])
-                    (outActionFactory:ReadParam => ChannelAction[O])
+  def translate[I,O](intActionFactory:Int => InputAction[I], outActionFactory:ReadParam => OutputAction[O])
                     (c:Computer):Operation = {
     val opCode = c.v(c.cursor)
     val op:Int = opCode % 100
     def rpF:Int => ReadParam = getReadParam(c.v, c.cursor)(opCode) // partially applied f to get ReadParam from opCursor
     if (op == 1) Sum(rpF(1),  rpF(2), c.v(c.cursor+3))
     else if (op == 2) Multiplication(rpF(1),  rpF(2), c.v(c.cursor+3))
-    else if (op == 3) intActionFactory(c.v())
+    else if (op == 3) intActionFactory(c.v(c.cursor+1))
     else if (op == 4) outActionFactory(rpF(1))
     else if (op == 5) JumpIfTrue(rpF(1), rpF(2))
     else if (op == 6) JumpIfFalse(rpF(1), rpF(2))
@@ -118,14 +128,19 @@ object IntcodeComputer {
 
 
   @tailrec
-  def operation[I,O](in:I)(output:O)(v:Vector[Int], cursor:Int):(Vector[Int], Int, Queue[Int]) = {
-    translate(in:A => (Int,A))(v, cursor) match {
-      case End => (v, cursor, output)
-      case op:ChannelAction =>
-      case op:Action => {
-        val (newV, out2) = op.execute(output)
-        operation(in)(out2)(newV, op.nextCursor(cursor))
-      }
+  def operation[I,O](intActionF:Int => InputAction[I],
+                     outActionF:ReadParam => OutputAction[O])
+                    (in:I)(out:O)(c:Computer):(Computer, O) = {
+    translate(intActionF, outActionF)(c) match {
+      case End => (c, out)
+      case op:InputAction[I] =>
+        val (newC, newIn) = op.execute(c,in)
+        operation(intActionF, outActionF)(newIn)(out)(newC)
+      case op:OutputAction[O] =>
+        val (newC, newOut) = op.execute(c,out)
+        operation(intActionF, outActionF)(in)(newOut)(newC)
+      case op:Action => operation(intActionF, outActionF)(in)(out)(op.execute(c))
+
     }
   }
 
@@ -135,11 +150,14 @@ object IntcodeComputer {
     scala.io.StdIn.readInt()
   }
 
-  def operationFromUserInput:(Vector[Int], Int) => (Vector[Int], Int) = {
-    (v:Vector[Int],c:Int) => {
-      val (v2, c2, o) = operation(readUserInput())(Queue[Int]())(v, c)
-      (v2,c2)
-    }
+  /** Convenience method to */
+  def operationFromUserInput(c:Computer): Computer = {
+    val (finalC, _) = operation(ManualInputAction.apply, ConsoleOutputAction.apply)(())(())(c)
+    finalC
+  }
+
+  def operationsQueues(c:Computer)(in:Queue[Int]):(Computer, Queue[Int]) = {
+    operation(QueueInputAction.apply, QueueOutputAction.apply)(in)(Queue[Int]())(c)
   }
 
 
