@@ -18,8 +18,8 @@ object day2 extends App{
 
   def compute(noun:Int, verb:Int, rawV:Vector[Int]):Int = {
     val startV = rawV updated(1, noun) updated (2, verb)
-    val (finalV, _) = operationFromUserInput(startV, 0)
-    finalV(0)
+    val finalComputer = operationFromUserInput(Computer(startV, 0))
+    finalComputer.v(0)
   }
 
   def findCombination(v:Vector[Int]):LazyList[(Int,Int,Int)] = {

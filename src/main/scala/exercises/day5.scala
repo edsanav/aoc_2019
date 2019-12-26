@@ -10,9 +10,10 @@ object day5 extends App {
 
   def run(input_file:String):(Int,Int) = {
     val rawV = readInput(input_file)
-    val firstRun = operation(1)(Queue[Int]())(rawV, 0)
-    val secondRun = operation(5)(Queue[Int]())(rawV, 0)
-    (firstRun._3.last,secondRun._3.last)
+    def operationsWithInput:Queue[Int] => (Computer, Queue[Int]) = operationsQueues(Computer(rawV,0))
+    val (_, firstOut) = operationsWithInput(Queue(1))
+    val (_, secondOut) = operationsWithInput(Queue(5))
+    (firstOut.last,secondOut.last)
   }
 
 
