@@ -1,12 +1,9 @@
 package exercises
 
-import exercises.IntcodeComputer.{Computer, operation, operationsQueues}
-import exercises.day2.readInput
+import exercises.IntcodeComputer.{Computer, operationsQueues}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Queue
-import scala.io.BufferedSource
-import scala.io.Source
 
 object day7 extends App{
 
@@ -53,7 +50,7 @@ object day7 extends App{
   }
 
   def run(input_file:String):(Int,Int) = {
-    val rawV = readInput(input_file)
+    val rawV = readVector(input_file)
     val software:Queue[Int] => Int = computeSignal(Computer(rawV, 0))
     (highestSignal(software, combine=Queue(0,1,2,3,4)), highestSignal(software, combine=Queue(5,6,7,8,9)))
   }

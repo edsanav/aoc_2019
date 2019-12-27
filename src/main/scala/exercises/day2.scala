@@ -7,14 +7,6 @@ import IntcodeComputer._
 
 object day2 extends App{
 
-  def csvToVector(csv:String):Vector[Int] = csv.split(",").map(_.toInt).toVector
-
-  def readInput(file:String):Vector[Int] = {
-    val lines = Source.fromResource(file).getLines()
-    if(lines.hasNext) csvToVector(lines.next) else Vector[Int]()
-  }
-
-
 
   def compute(noun:Int, verb:Int, rawV:Vector[Int]):Int = {
     val startV = rawV updated(1, noun) updated (2, verb)
@@ -30,7 +22,7 @@ object day2 extends App{
   }
 
   def run(input_file:String):(Int,Int) = {
-    val rawV = readInput(input_file)
+    val rawV = readVector(input_file)
     val part1 = compute(12, 2, rawV)
     val (noun, verb, _) = findCombination(rawV).find( x => x._3 == 19690720).get
     val part2 = (noun*100 + verb)
