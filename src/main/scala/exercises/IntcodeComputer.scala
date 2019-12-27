@@ -126,7 +126,7 @@ object IntcodeComputer {
   }
 
 
-
+  //TODO this function and the next want can be possible rethaught
   @tailrec
   def operation[I,O](intActionF:Int => InputAction[I],
                      outActionF:ReadParam => OutputAction[O])
@@ -140,7 +140,21 @@ object IntcodeComputer {
         val (newC, newOut) = op.execute(c,out)
         operation(intActionF, outActionF)(in)(newOut)(newC)
       case op:Action => operation(intActionF, outActionF)(in)(out)(op.execute(c))
+    }
+  }
 
+  @tailrec //Ad-hoc solution, don't quite like it
+  def operationQPause(in:Queue[Int])(out:Queue[Int])(c:Computer):(Option[Computer], Queue[Int]) = {
+    translate(QueueInputAction.apply, QueueOutputAction.apply)(c) match {
+      case End => (None, out)
+      case _:QueueInputAction if in.isEmpty => (Some(c), out)
+      case op:QueueInputAction if in.nonEmpty =>
+        val (newC, newIn) = op.execute(c,in)
+        operationQPause(newIn)(out)(newC)
+      case op:QueueOutputAction =>
+        val (newC, newOut) = op.execute(c,out)
+        operationQPause(in)(newOut)(newC)
+      case op:Action => operationQPause(in)(out)(op.execute(c))
     }
   }
 
@@ -156,8 +170,8 @@ object IntcodeComputer {
     finalC
   }
 
-  def operationsQueues(c:Computer)(in:Queue[Int]):(Computer, Queue[Int]) = {
-    operation(QueueInputAction.apply, QueueOutputAction.apply)(in)(Queue[Int]())(c)
+  def operationsQueues(c:Computer)(in:Queue[Int]):(Option[Computer], Queue[Int]) = {
+    operationQPause(in)(Queue[Int]())(c)
   }
 
 
