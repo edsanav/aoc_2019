@@ -32,7 +32,7 @@ object day8 extends App{
     Layer(layers.head.pixels.indices.map(position=>getPixel(layers,position)).toVector)
 
   def run(input_file:String):(Int,Int) = {
-    val allPixels = readVector(input_file, sep="")
+    val allPixels = readIntsVector(input_file, sep="")
     val layers = allPixels.grouped(Layer.flatLength).map(x => Layer(x)).toList
     val minZerosLayer = layers.min(Ordering[Int].on[Layer](layer => layer.counts.getOrElse(0,0)))
     println(getStackedVector(layers).rows.mkString("\n")) //TODO as improvement, turn this into an actual image

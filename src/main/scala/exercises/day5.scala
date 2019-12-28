@@ -7,11 +7,11 @@ import scala.collection.immutable.Queue
 
 object day5 extends App {
 
-  def run(input_file:String):(Int,Int) = {
-    val rawV = readVector(input_file)
-    def operationsWithInput:Queue[Int] => (Option[Computer], Queue[Int]) = operationsQueues(Computer(rawV,0))
-    val (_, firstOut) = operationsWithInput(Queue(1))
-    val (_, secondOut) = operationsWithInput(Queue(5))
+  def run(input_file:String):(BigInt,BigInt) = {
+    val rawV = readBigIntsVector(input_file)
+    def operationsWithInput:Queue[BigInt] => (Option[Computer], Queue[BigInt]) = operationsQueues(Computer(rawV,0))
+    val (_, firstOut) = operationsWithInput(Queue(BigInt(1)))
+    val (_, secondOut) = operationsWithInput(Queue(BigInt(5)))
     (firstOut.last,secondOut.last)
   }
 

@@ -6,13 +6,15 @@ import scala.collection.immutable.Queue
 object IntcodeComputer {
   //TODO refactor?
 
-  case class Computer(v:Vector[Int], cursor:Int)
+  implicit def bigIntToInt(i: BigInt): Int = i.toInt
 
-  type Result = Queue[Int] => (Vector[Int], Queue[Int]) // State?
-  type ReadParam = Vector[Int] => Int
+  case class Computer(v:Vector[BigInt], cursor:BigInt)
 
-  def positional(p:Int): ReadParam = (v:Vector[Int]) => v(p)
-  def immediate(p:Int): ReadParam = (_:Vector[Int]) => p
+  type Result = Queue[BigInt] => (Vector[BigInt], Queue[BigInt]) // State?
+  type ReadParam = Vector[BigInt] => BigInt
+
+  def positional(p:BigInt): ReadParam = (v:Vector[BigInt]) => v(p)
+  def immediate(p:BigInt): ReadParam = (_:Vector[BigInt]) => p
 
   sealed trait Operation
 
@@ -28,25 +30,25 @@ object IntcodeComputer {
     def execute: (Computer, A) => (Computer, A)
   }
 
-  case class Sum(p1: ReadParam, p2: ReadParam, result: Int) extends Action {
+  case class Sum(p1: ReadParam, p2: ReadParam, result: BigInt) extends Action {
     def execute:Computer => Computer =
       (c: Computer) => Computer(c.v.updated(result, p1(c.v) + p2(c.v)), c.cursor+4)
   }
 
-  case class Multiplication(p1: ReadParam, p2: ReadParam, result: Int) extends Action {
+  case class Multiplication(p1: ReadParam, p2: ReadParam, result: BigInt) extends Action {
     def execute:Computer => Computer =
       (c: Computer) => Computer(c.v.updated(result, p1(c.v) * p2(c.v)), c.cursor+4)
   }
 
-  case class ManualInputAction(result:Int) extends InputAction[Unit] {
+  case class ManualInputAction(result:BigInt) extends InputAction[Unit] {
     def execute:(Computer, Unit) => (Computer, Unit) =
       (c: Computer, Unit) => (Computer(c.v.updated(result, readUserInput()), c.cursor+2), Unit)
   }
 
-  case class QueueInputAction(result:Int) extends InputAction[Queue[Int]] {
+  case class QueueInputAction(result:BigInt) extends InputAction[Queue[BigInt]] {
 
-    def execute:(Computer, Queue[Int]) => (Computer, Queue[Int]) =
-      (c: Computer, q:Queue[Int]) => {
+    def execute:(Computer, Queue[BigInt]) => (Computer, Queue[BigInt]) =
+      (c: Computer, q:Queue[BigInt]) => {
         val (intval, newQ) = q.dequeue
         (Computer(c.v.updated(result, intval), c.cursor+2), newQ)
       }
@@ -61,9 +63,9 @@ object IntcodeComputer {
       }
   }
 
-  case class QueueOutputAction(p1:ReadParam) extends OutputAction[Queue[Int]] {
-    def execute:(Computer, Queue[Int]) => (Computer, Queue[Int]) =
-      (c: Computer, q:Queue[Int]) => (Computer(c.v, c.cursor+2), q:+ p1(c.v))
+  case class QueueOutputAction(p1:ReadParam) extends OutputAction[Queue[BigInt]] {
+    def execute:(Computer, Queue[BigInt]) => (Computer, Queue[BigInt]) =
+      (c: Computer, q:Queue[BigInt]) => (Computer(c.v, c.cursor+2), q:+ p1(c.v))
   }
 
   case class JumpIfTrue(p1:ReadParam, p2:ReadParam) extends Action {
@@ -83,7 +85,7 @@ object IntcodeComputer {
   }
 
 
-  case class LessThan(p1:ReadParam, p2:ReadParam, result:Int) extends Action {
+  case class LessThan(p1:ReadParam, p2:ReadParam, result:BigInt) extends Action {
     def execute:Computer => Computer =
       (c: Computer) => {
         val toStore = if (p1(c.v) < p2(c.v)) 1 else 0
@@ -91,7 +93,7 @@ object IntcodeComputer {
       }
   }
 
-  case class Equals(p1:ReadParam, p2:ReadParam, result:Int) extends Action {
+  case class Equals(p1:ReadParam, p2:ReadParam, result:BigInt) extends Action {
     def execute:Computer => Computer =
       (c: Computer) => {
         val toStore = if (p1(c.v) == p2(c.v)) 1 else 0
@@ -102,17 +104,17 @@ object IntcodeComputer {
   case object End extends Operation
 
 
-  def getReadParam(v:Vector[Int], cursor:Int)(opCode:Int)(opCursor: Int):ReadParam = {
-    val mode = (opCode / 100) / math.pow(10, opCursor-1).toInt % 10
-    if (mode == 1) immediate(v(cursor+opCursor))
-    else positional(v(cursor+opCursor))
+  def getReadParam(v:Vector[BigInt], cursor:BigInt)(opCode:BigInt)(opCursor: BigInt):ReadParam = {
+    val mode = (opCode / 100) / math.pow(10, (opCursor-1).toInt).toInt % 10
+    if (mode == 1) immediate(v((cursor+opCursor)))
+    else positional(v((cursor+opCursor)))
   }
 
-  def translate[I,O](intActionFactory:Int => InputAction[I], outActionFactory:ReadParam => OutputAction[O])
+  def translate[I,O](intActionFactory:BigInt => InputAction[I], outActionFactory:ReadParam => OutputAction[O])
                     (c:Computer):Operation = {
     val opCode = c.v(c.cursor)
-    val op:Int = opCode % 100
-    def rpF:Int => ReadParam = getReadParam(c.v, c.cursor)(opCode) // partially applied f to get ReadParam from opCursor
+    val op:BigInt = opCode % 100
+    def rpF:BigInt => ReadParam = getReadParam(c.v, c.cursor)(opCode) // partially applied f to get ReadParam from opCursor
     if (op == 1) Sum(rpF(1),  rpF(2), c.v(c.cursor+3))
     else if (op == 2) Multiplication(rpF(1),  rpF(2), c.v(c.cursor+3))
     else if (op == 3) intActionFactory(c.v(c.cursor+1))
@@ -128,7 +130,7 @@ object IntcodeComputer {
 
   //TODO this function and the next want can be possible rethaught
   @tailrec
-  def operation[I,O](intActionF:Int => InputAction[I],
+  def operation[I,O](intActionF:BigInt => InputAction[I],
                      outActionF:ReadParam => OutputAction[O])
                     (in:I)(out:O)(c:Computer):(Computer, O) = {
     translate(intActionF, outActionF)(c) match {
@@ -144,7 +146,7 @@ object IntcodeComputer {
   }
 
   @tailrec //Ad-hoc solution, don't quite like it
-  def operationQPause(in:Queue[Int])(out:Queue[Int])(c:Computer):(Option[Computer], Queue[Int]) = {
+  def operationQPause(in:Queue[BigInt])(out:Queue[BigInt])(c:Computer):(Option[Computer], Queue[BigInt]) = {
     translate(QueueInputAction.apply, QueueOutputAction.apply)(c) match {
       case End => (None, out)
       case _:QueueInputAction if in.isEmpty => (Some(c), out)
@@ -158,7 +160,7 @@ object IntcodeComputer {
     }
   }
 
-  def readUserInput():Int = {
+  def readUserInput():BigInt = {
     //This, as the readInput is not very functional. Consider using some libraries (Cats? ZIO?) and cleaning it a bit
     println("PLEASE, PROVIDE AN INPUT VALUE AND PRESS ENTER")
     scala.io.StdIn.readInt()
@@ -170,8 +172,8 @@ object IntcodeComputer {
     finalC
   }
 
-  def operationsQueues(c:Computer)(in:Queue[Int]):(Option[Computer], Queue[Int]) = {
-    operationQPause(in)(Queue[Int]())(c)
+  def operationsQueues(c:Computer)(in:Queue[BigInt]):(Option[Computer], Queue[BigInt]) = {
+    operationQPause(in)(Queue[BigInt]())(c)
   }
 
 
