@@ -6,6 +6,7 @@ object Main extends IOApp {
 
   def runModule(id:String):IO[Int] = id match {
     case "1" => ex1.run
+    case "2" => ex2.run
     case _ => IO.raiseError(new IllegalArgumentException("Invalid week number"))
   }
 
