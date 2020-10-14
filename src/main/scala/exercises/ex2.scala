@@ -14,29 +14,34 @@ object ex2 {
   )
 
   final case class Computer(v:Vector[Int], cursor:Int){
-
     def value:Int = v(cursor)
-    def idx:Int = v(cursor+1)
-    def idy:Int = v(cursor+2)
-    def target:Int = v(cursor+3)
-
-    def next:Operation = {
-      value match {
-        case 99 => Halt
-        case 1 => Sum(v(idx), v(idy))
-        case 2 => Multiplication(v(idx), v(idy))
-      }
-    }
-
-    def execute:Computer = {
-      next match {
-        case sum:Sum => Computer(v.updated(target, sum.result), cursor+4)
-        case prod:Multiplication => Computer(v.updated(target, prod.result), cursor+4)
-        case _ => throw new IllegalArgumentException(s"Invalid operation at position $cursor")
-      }
-    }
-
   }
+
+  sealed abstract class Instruction{
+    def result:Computer
+  }
+  trait Operation extends Instruction {
+    val computer:Computer
+    val op:(Int,Int)=>Int
+    def result:Computer = {
+      val target = computer.v(computer.cursor + 3)
+      val idx = computer.v(computer.cursor+1)
+      val idy = computer.v(computer.cursor+2)
+      val result = op(computer.v(idx), computer.v(idy))
+      val nextCursor = computer.cursor + 4
+      Computer(computer.v.updated(target, result), nextCursor)
+    }
+  }
+  final case class Sum(computer: Computer) extends Operation {
+    override val op:(Int, Int)=>Int = (_ + _)
+  }
+  final case class Multiplication(computer:Computer) extends Operation {
+    override val op:(Int, Int)=>Int = (_ * _)
+  }
+  final case class Halt(computer:Computer) extends Instruction{
+    def result:Computer = computer
+  }
+
 
   type ComputerState[A] = State[Computer, A]
 
@@ -44,44 +49,34 @@ object ex2 {
     for {
       lines <- loadResourceFile(INPUT).use(getLines)
       initial <- IO(setup(lines.head, SETUP))
-      result <- IO(go.runA(Computer(initial, 0)).value)
+      result <- IO(go.runA(initial).value)
     } yield result
   }
 
-  sealed abstract class Operation
-  final case class Sum(a:Int, b:Int) extends Operation{
-    val result:Int = a+b
-  }
-  final case class Multiplication(a:Int, b:Int) extends Operation{
-    val result:Int = a*b
-  }
-  case object Halt extends Operation
-
-
-  //TODO this seems kind of wrong
   def go:ComputerState[Int] = {
-    State[Computer, Int]{
-      (comp:Computer) =>
-        comp.next match {
-          case Halt => (comp, comp.v(0))
-          case _:Sum|_:Product =>
-            val newComp = comp.execute
-            go.run(newComp).value
-        }
-    }
+    for {
+      inst <- State.inspect[Computer, Instruction](instruction)
+      outInt <- inst match {
+        case h:Halt => State.inspect[Computer, Int](_ => h.result.v(0))
+        case op:Operation => for {
+          _ <- State.set(op.result)
+          res <- go
+        } yield res
+      }
+    } yield outInt
   }
 
-  def setup(line:String, operations:List[Vector[Int] => Vector[Int]]):Vector[Int] = {
+
+  def setup(line:String, operations:List[Vector[Int] => Vector[Int]]):Computer = {
     val initial = line.split(",").map(_.toInt).toVector
-    operations.foldLeft(initial){case (v, op) => op(v)}
+    Computer(operations.foldLeft(initial){case (v, op) => op(v)}, 0)
   }
 
-  def toOperation(opCode:Int):(Int, Int) => Int ={
-    opCode match {
-      case 1 => (_ + _)
-      case 2 => (_ * _)
-      case _ => throw new UnsupportedOperationException(s"$opCode is not a valid operation code")
-    }
-  }
+  def instruction(computer:Computer):Instruction = computer.value match {
+        case 99 => Halt(computer)
+        case 1 => Sum(computer)
+        case 2 => Multiplication(computer)
+        case _ => throw new UnsupportedOperationException(s"${computer.value} is not a valid operation code")
+      }
 
 }
