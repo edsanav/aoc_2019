@@ -3,61 +3,70 @@ package exercises
 import cats.data.State
 import exercises.auxiliar.loadResourceFile
 import auxiliar._
+import cats.Semigroupal
 import cats.effect.IO
+import cats.syntax.show._
 
 object ex2 {
 
   val INPUT:String = "inputs/day2.csv"
-  val SETUP = List(
-    (v:Vector[Int]) => v.updated(1, 12),
-    (v:Vector[Int]) => v.updated(2, 2)
-  )
 
-  final case class Computer(v:Vector[Int], cursor:Int){
-    def value:Int = v(cursor)
+  val EXPECTED = 19690720
+
+  final case class Computer(mem:Vector[Int], cursor:Int=0){
+    def updated(pos:Int, newVal:Int):Computer = Computer(mem.updated(pos, newVal), cursor)
+    def initialize(noun:Int, verb:Int):Computer = updated(1, noun).updated(2, verb)
+    def value:Int = mem(cursor)
   }
 
   sealed abstract class Instruction{
+    val opCode:Int
     def result:Computer
   }
   trait Operation extends Instruction {
     val computer:Computer
     val op:(Int,Int)=>Int
     def result:Computer = {
-      val target = computer.v(computer.cursor + 3)
-      val idx = computer.v(computer.cursor+1)
-      val idy = computer.v(computer.cursor+2)
-      val result = op(computer.v(idx), computer.v(idy))
+      val target = computer.mem(computer.cursor + 3)
+      val idx = computer.mem(computer.cursor+1)
+      val idy = computer.mem(computer.cursor+2)
+      val result = op(computer.mem(idx), computer.mem(idy))
       val nextCursor = computer.cursor + 4
-      Computer(computer.v.updated(target, result), nextCursor)
+      Computer(computer.mem.updated(target, result), nextCursor)
     }
   }
   final case class Sum(computer: Computer) extends Operation {
+    override val opCode: Int = 1
     override val op:(Int, Int)=>Int = (_ + _)
   }
   final case class Multiplication(computer:Computer) extends Operation {
+    override val opCode: Int = 2
     override val op:(Int, Int)=>Int = (_ * _)
   }
   final case class Halt(computer:Computer) extends Instruction{
+    override val opCode: Int = 99
     def result:Computer = computer
   }
 
 
   type ComputerState[A] = State[Computer, A]
 
-  def run: IO[Int] = {
+  def run: IO[String] = {
+    // TODO parellize
+    // TODO ftions should return IO instead?
     for {
       lines <- loadResourceFile(INPUT).use(getLines)
-      initial <- IO(setup(lines.head, SETUP))
-      result <- IO(go.runA(initial).value)
-    } yield result
+      computer <- IO(Computer(lines.head.split(",").map(_.toInt).toVector))
+      result <- IO(execute(computer.initialize(12, 2)))
+      combination <-IO(findInitValues(computer, EXPECTED))
+    } yield (result, combination).show
   }
 
   def go:ComputerState[Int] = {
     for {
       inst <- State.inspect[Computer, Instruction](instruction)
       outInt <- inst match {
-        case h:Halt => State.inspect[Computer, Int](_ => h.result.v(0))
+        case h:Halt => State.inspect[Computer, Int](_ => h.result.mem(0))
         case op:Operation => for {
           _ <- State.set(op.result)
           res <- go
@@ -66,11 +75,19 @@ object ex2 {
     } yield outInt
   }
 
+  def execute(computer:Computer):Int = go.runA(computer).value
 
-  def setup(line:String, operations:List[Vector[Int] => Vector[Int]]):Computer = {
-    val initial = line.split(",").map(_.toInt).toVector
-    Computer(operations.foldLeft(initial){case (v, op) => op(v)}, 0)
+
+  def findInitValues(computer:Computer, expected:Int):Int = {
+    val combinations = Semigroupal[LazyList].product(LazyList.range(1,100), LazyList.range(1,100))
+    val initValues = combinations.find{case (noun, verb) => execute(computer.initialize(noun, verb)) == expected }
+    initValues match {
+      case Some((noun, verb)) =>  100 * noun + verb
+      case None => throw new RuntimeException("Combination not found")
+    }
   }
+
+
 
   def instruction(computer:Computer):Instruction = computer.value match {
         case 99 => Halt(computer)
