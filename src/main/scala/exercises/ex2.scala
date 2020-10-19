@@ -53,7 +53,10 @@ object ex2 {
 
   def run: IO[String] = {
     // TODO parellize
-    // TODO ftions should return IO instead?
+    // TODO shouldn't be throwing execeptions around, should use Either[String, A] or something
+    // TODO functions probably should return State[Either[ so final stack should be something like
+    //  IO[State[Either[String, ComputerState[A]]] and work with EitherT[StateT[IO...]
+    // TODO check https://typelevel.org/cats-mtl/getting-started.html
     for {
       lines <- loadResourceFile(INPUT).use(getLines)
       computer <- IO(Computer(lines.head.split(",").map(_.toInt).toVector))
@@ -61,6 +64,8 @@ object ex2 {
       combination <-IO(findInitValues(computer, EXPECTED))
     } yield (result, combination).show
   }
+
+
 
   def go:ComputerState[Int] = {
     for {
