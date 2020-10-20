@@ -1,6 +1,7 @@
 package exercises
 
-import cats.data.State
+import cats.data.{EitherT, State}
+import cats.instances.either._ // for Monad
 import exercises.auxiliar.loadResourceFile
 import auxiliar._
 import cats.Semigroupal
@@ -10,8 +11,13 @@ import cats.syntax.show._
 object ex2 {
 
   val INPUT:String = "inputs/day2.csv"
-
   val EXPECTED = 19690720
+
+  type ComputerState[A] = State[Computer, A]
+  type ComputerStateEither[A] = EitherT[ComputerState, String, A]
+  type Result[A] = Either[String , A] //TODO use proper errors not just strings
+
+
 
   final case class Computer(mem:Vector[Int], cursor:Int=0){
     def updated(pos:Int, newVal:Int):Computer = Computer(mem.updated(pos, newVal), cursor)
@@ -49,7 +55,7 @@ object ex2 {
   }
 
 
-  type ComputerState[A] = State[Computer, A]
+
 
   def run: IO[String] = {
     // TODO parellize
@@ -59,46 +65,57 @@ object ex2 {
     // TODO check https://typelevel.org/cats-mtl/getting-started.html
     for {
       lines <- loadResourceFile(INPUT).use(getLines)
-      computer <- IO(Computer(lines.head.split(",").map(_.toInt).toVector))
-      result <- IO(execute(computer.initialize(12, 2)))
+//      computer <- IO(Computer(lines.head.split(",").map(_.toInt).toVector))
+//      result <- IO(execute(computer.initialize(12, 2)))
+      computer <- IO(Computer(Vector(2,4,4,5,99,0)))
+      result <- IO(execute(computer))
       combination <-IO(findInitValues(computer, EXPECTED))
     } yield (result, combination).show
   }
 
-
-
-  def go:ComputerState[Int] = {
+  // A note:
+  // Probably using State is an overkill, and using monad transformers even more, but, just for testing purposes
+  def go:ComputerStateEither[Int] = {
     for {
-      inst <- State.inspect[Computer, Instruction](instruction)
+      inst <- EitherT[ComputerState, String, Instruction](State.inspect[Computer, Either[String, Instruction]](instruction))
       outInt <- inst match {
-        case h:Halt => State.inspect[Computer, Int](_ => h.result.mem(0))
-        case op:Operation => for {
-          _ <- State.set(op.result)
-          res <- go
-        } yield res
+        case h:Halt => {
+
+          EitherT[ComputerState, String, Int](State.inspect[Computer,  Either[String, Int]](_ => Right(h.result.mem(0))))
+        }
+        case op:Operation =>
+          println(op)
+          for {
+            _ <- State.set(op.result)
+            res <- go.value
+          } yield  EitherT[ComputerState, String, Int](State.pure[Computer, Result[Int]](res)) //TODO fixme
       }
     } yield outInt
   }
 
-  def execute(computer:Computer):Int = go.runA(computer).value
+  def execute(computer:Computer):Result[Int] = go.value.runA(computer).value
 
 
-  def findInitValues(computer:Computer, expected:Int):Int = {
+  def findInitValues(computer:Computer, expected:Int):Result[Int] = {
     val combinations = Semigroupal[LazyList].product(LazyList.range(1,100), LazyList.range(1,100))
-    val initValues = combinations.find{case (noun, verb) => execute(computer.initialize(noun, verb)) == expected }
-    initValues match {
-      case Some((noun, verb)) =>  100 * noun + verb
-      case None => throw new RuntimeException("Combination not found")
+    val initValues = for {
+      (noun,verb) <- combinations
+      result <- go.value.runA(computer.initialize(noun, verb)).value.toOption //This will work but will swallow the error
+      if (result==expected)
+    } yield (noun, verb)
+
+    initValues.headOption match {
+      case Some((noun, verb)) =>  Right(100 * noun + verb)
+      case None => Left("Combination not found")
     }
   }
 
 
-
-  def instruction(computer:Computer):Instruction = computer.value match {
-        case 99 => Halt(computer)
-        case 1 => Sum(computer)
-        case 2 => Multiplication(computer)
-        case _ => throw new UnsupportedOperationException(s"${computer.value} is not a valid operation code")
+  def instruction(computer:Computer):Result[Instruction] = computer.value match {
+        case 99 => Right(Halt(computer))
+        case 1 => Right(Sum(computer))
+        case 2 => Right(Multiplication(computer))
+        case _ => Left(s"${computer.value} is not a valid operation code")
       }
 
 }
