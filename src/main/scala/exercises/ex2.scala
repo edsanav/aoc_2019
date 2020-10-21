@@ -65,30 +65,29 @@ object ex2 {
     // TODO check https://typelevel.org/cats-mtl/getting-started.html
     for {
       lines <- loadResourceFile(INPUT).use(getLines)
-//      computer <- IO(Computer(lines.head.split(",").map(_.toInt).toVector))
-//      result <- IO(execute(computer.initialize(12, 2)))
-      computer <- IO(Computer(Vector(2,4,4,5,99,0)))
-      result <- IO(execute(computer))
+      computer <- IO(Computer(lines.head.split(",").map(_.toInt).toVector))
+      result <- IO(execute(computer.initialize(12, 2)))
+//      computer <- IO(Computer(Vector(2,4,4,5,99,0)))
+//      result <- IO(execute(computer))
       combination <-IO(findInitValues(computer, EXPECTED))
     } yield (result, combination).show
   }
 
   // A note:
   // Probably using State is an overkill, and using monad transformers even more, but, just for testing purposes
+  // TODO clean this mess
   def go:ComputerStateEither[Int] = {
     for {
       inst <- EitherT[ComputerState, String, Instruction](State.inspect[Computer, Either[String, Instruction]](instruction))
-      outInt <- inst match {
-        case h:Halt => {
-
-          EitherT[ComputerState, String, Int](State.inspect[Computer,  Either[String, Int]](_ => Right(h.result.mem(0))))
-        }
-        case op:Operation =>
-          println(op)
-          for {
+      outInt <- {
+        val out:State[Computer, Either[String, Int]] = inst match {
+          case h:Halt =>  State.inspect[Computer,  Either[String, Int]](_ => Right(h.result.mem(0)))
+          case op:Operation => for {
             _ <- State.set(op.result)
             res <- go.value
-          } yield  EitherT[ComputerState, String, Int](State.pure[Computer, Result[Int]](res)) //TODO fixme
+          } yield res
+        }
+        EitherT[ComputerState, String, Int](out)
       }
     } yield outInt
   }
