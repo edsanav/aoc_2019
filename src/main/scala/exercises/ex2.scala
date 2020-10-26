@@ -1,7 +1,7 @@
 package exercises
 
 import cats.data.{EitherT, State}
-import cats.instances.either._ // for Monad
+import cats.instances.either._
 import exercises.auxiliar.loadResourceFile
 import auxiliar._
 import cats.Semigroupal
@@ -14,38 +14,52 @@ object ex2 {
   val EXPECTED = 19690720
 
   type ComputerState[A] = State[Computer, A]
-  type ComputerStateEither[A] = EitherT[ComputerState, String, A]
   type Result[A] = Either[String, A] //TODO use proper errors not just strings
+  type ComputerResult[A] = Either[ComputerError, A]
+
+
+  sealed abstract class Error extends Exception
+
+  // Computer related errors
+  sealed abstract class ComputerError(message:String) extends Error
+  case class MemoryError[A](v:Vector[A], pos:Int) extends ComputerError(message=s"Unable to access posicion $pos of vector $v")
+  case class IllegalOperationError(op:Operation) extends ComputerError(message=s"Unable to perform $op")
+
 
 
   final case class Computer(mem: Vector[Int], cursor: Int = 0) {
-    def updated(pos: Int, newVal: Int): Computer = Computer(mem.updated(pos, newVal), cursor)
+    def updated(pos: Int, newVal: Int, newCursor:Int = cursor): Result[Computer] = {
+      if (pos >= mem.size) Left(s"Invalid memory position $pos for computer of ${mem.size} size")
+      else Right(Computer(mem.updated(pos, newVal), newCursor))
+    }
 
-    def initialize(noun: Int, verb: Int): Computer = updated(1, noun).updated(2, verb)
+    def initialize(noun: Int, verb: Int): Result[Computer] = updated(1, noun).flatMap(_.updated(2, verb))
 
-    def value: Int = mem(cursor)
+    def value: Result[Int] = this.apply(cursor)
 
-    def apply(x:Int):Int = mem(x)
+    def apply(pos:Int):Result[Int] =
+      if (pos >= mem.size) Left(s"Invalid memory position $pos for computer of ${mem.size} size")
+      else Right(mem(pos))
   }
 
   sealed abstract class Instruction {
     val opCode: Int
-
-    def result: Computer
+    def result: Result[Computer]
   }
 
   trait Operation extends Instruction {
     val computer: Computer
     val op: (Int, Int) => Int
 
-    // TODO Computer change it to Result[Computer]
-    def result: Computer = {
-      val target = computer(computer.cursor + 3)
-      val idx = computer(computer.cursor + 1)
-      val idy = computer(computer.cursor + 2)
-      val result = op(computer(idx), computer(idy))
-      val nextCursor = computer.cursor + 4
-      Computer(computer.mem.updated(target, result), nextCursor)
+    def result: Result[Computer] = {
+      for {
+        target <- computer(computer.cursor + 3)
+        idx <- computer(computer.cursor + 1)
+        idy <- computer(computer.cursor + 2)
+        x <- computer(idx)
+        y <- computer(idy)
+        result <- computer.updated(target, op(x,y), computer.cursor + 4)
+      } yield result
     }
   }
 
@@ -62,7 +76,7 @@ object ex2 {
   final case class Halt(computer: Computer) extends Instruction {
     override val opCode: Int = 99
 
-    def result: Computer = computer
+    def result: Result[Computer] = Right(computer)
   }
 
 
@@ -74,7 +88,7 @@ object ex2 {
     for {
       lines <- loadResourceFile(INPUT).use(getLines)
       computer <- IO(Computer(lines.head.split(",").map(_.toInt).toVector))
-      result <- IO(execute(computer.initialize(12, 2)))
+      result <- IO(computer.initialize(12, 2).flatMap(execute))
 //      computer <- IO(Computer(Vector(2,4,4,5,99,0)))
 //      result <- IO(execute(computer))
       combination <- IO(findInitValues(computer, EXPECTED))
@@ -88,12 +102,19 @@ object ex2 {
       inst <- EitherT(State.inspect(instruction))
       outInt <- EitherT[ComputerState, String, Int](
         inst match {
-          case h: Halt => State.inspect(_ => Right(h.result(0)))
-          case op: Operation => for {
-            _ <- State.set(op.result)
-            res <- go
-          } yield res
-        })
+          case h: Halt => State.inspect(_ => h.result.flatMap(comp => comp(0)))
+          case op: Operation => {
+            val opRes = op.result
+            opRes match {
+              case Right(comp) => for {
+                    _ <- State.set[Computer](comp)
+                    res <- go //FIXME
+                  } yield res
+              case Left(l) => State.pure(Left(l))
+            }
+          }
+        }
+      )
     } yield outInt).value
 
   def execute(computer: Computer): Result[Int] = go.runA(computer).value
@@ -104,7 +125,7 @@ object ex2 {
     val combinations = Semigroupal[LazyList].product(LazyList.range(1, 100), LazyList.range(1, 100))
     val resultsStream = combinations.find{
       case (noun, verb) =>
-        execute(computer.initialize(noun, verb)) match {
+        computer.initialize(noun, verb).flatMap(execute) match {
           case Right(x) => if (x == expected) true else false
           case Left(_) => true
         }
@@ -112,7 +133,7 @@ object ex2 {
     resultsStream match {
       case None => Left("Combination not found")
       case Some((noun, verb)) =>
-        execute(computer.initialize(noun, verb)) match {
+        computer.initialize(noun, verb).flatMap(execute) match {
           case Right(_) => Right(100 * noun + verb)
           case x => x // Other error we return
         }
@@ -121,9 +142,9 @@ object ex2 {
 
 
   def instruction(computer: Computer): Result[Instruction] = computer.value match {
-    case 99 => Right(Halt(computer))
-    case 1 => Right(Sum(computer))
-    case 2 => Right(Multiplication(computer))
+    case Right(99) => Right(Halt(computer))
+    case Right(1) => Right(Sum(computer))
+    case Right(2) => Right(Multiplication(computer))
     case _ => Left(s"${computer.value} is not a valid operation code")
   }
 
