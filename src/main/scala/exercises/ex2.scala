@@ -1,99 +1,53 @@
 package exercises
 
-import cats.data.State
+import cats.instances.either._
 import exercises.auxiliar.loadResourceFile
 import auxiliar._
 import cats.Semigroupal
 import cats.effect.IO
 import cats.syntax.show._
+import exercises.computer.{Computer, Result, execute}
 
 object ex2 {
 
-  val INPUT:String = "inputs/day2.csv"
-
+  val INPUT: String = "inputs/day2.csv"
   val EXPECTED = 19690720
 
-  final case class Computer(mem:Vector[Int], cursor:Int=0){
-    def updated(pos:Int, newVal:Int):Computer = Computer(mem.updated(pos, newVal), cursor)
-    def initialize(noun:Int, verb:Int):Computer = updated(1, noun).updated(2, verb)
-    def value:Int = mem(cursor)
-  }
-
-  sealed abstract class Instruction{
-    val opCode:Int
-    def result:Computer
-  }
-  trait Operation extends Instruction {
-    val computer:Computer
-    val op:(Int,Int)=>Int
-    def result:Computer = {
-      val target = computer.mem(computer.cursor + 3)
-      val idx = computer.mem(computer.cursor+1)
-      val idy = computer.mem(computer.cursor+2)
-      val result = op(computer.mem(idx), computer.mem(idy))
-      val nextCursor = computer.cursor + 4
-      Computer(computer.mem.updated(target, result), nextCursor)
-    }
-  }
-  final case class Sum(computer: Computer) extends Operation {
-    override val opCode: Int = 1
-    override val op:(Int, Int)=>Int = (_ + _)
-  }
-  final case class Multiplication(computer:Computer) extends Operation {
-    override val opCode: Int = 2
-    override val op:(Int, Int)=>Int = (_ * _)
-  }
-  final case class Halt(computer:Computer) extends Instruction{
-    override val opCode: Int = 99
-    def result:Computer = computer
-  }
-
-
-  type ComputerState[A] = State[Computer, A]
 
   def run: IO[String] = {
+    // TODO check https://typelevel.org/cats-mtl/getting-started.html
     // TODO parellize
-    // TODO ftions should return IO instead?
     for {
       lines <- loadResourceFile(INPUT).use(getLines)
       computer <- IO(Computer(lines.head.split(",").map(_.toInt).toVector))
-      result <- IO(execute(computer.initialize(12, 2)))
-      combination <-IO(findInitValues(computer, EXPECTED))
+      result <- IO(computer.initialize(12, 2).flatMap(execute))
+      combination <- IO(findInitValues(computer, EXPECTED))
     } yield (result, combination).show
   }
 
-  def go:ComputerState[Int] = {
-    for {
-      inst <- State.inspect[Computer, Instruction](instruction)
-      outInt <- inst match {
-        case h:Halt => State.inspect[Computer, Int](_ => h.result.mem(0))
-        case op:Operation => for {
-          _ <- State.set(op.result)
-          res <- go
-        } yield res
+
+  def findInitValues(computer: Computer, expected: Int): Result[Int] = {
+    // Stream of combination
+    val combinations = Semigroupal[LazyList].product(LazyList.range(1, 100), LazyList.range(1, 100))
+    // Results are not calculated until required (lazy list is a stream)
+    val inputResults = combinations.map {
+      case (noun, verb) => ((noun, verb), computer.initialize(noun, verb).flatMap(execute))
+    }
+    // We search for the first hit or the first error of the stream
+    val hitOrError = inputResults.find{case (_, result) => result match {
+      case Right(x) => expected == x
+      case Left(_) => true
       }
-    } yield outInt
-  }
-
-  def execute(computer:Computer):Int = go.runA(computer).value
-
-
-  def findInitValues(computer:Computer, expected:Int):Int = {
-    val combinations = Semigroupal[LazyList].product(LazyList.range(1,100), LazyList.range(1,100))
-    val initValues = combinations.find{case (noun, verb) => execute(computer.initialize(noun, verb)) == expected }
-    initValues match {
-      case Some((noun, verb)) =>  100 * noun + verb
-      case None => throw new RuntimeException("Combination not found")
+    }
+    // Verify if found value is a hit or an error and act accordingly
+    hitOrError match {
+      case Some(((noun,verb), result)) => result match {
+        case Right(_) => Right(100 * noun + verb) // With hit, noun and verb are used to compute value
+        case left => left // Error is returned directly
+      }
+      case None => Left("Combination not found")
     }
   }
 
-
-
-  def instruction(computer:Computer):Instruction = computer.value match {
-        case 99 => Halt(computer)
-        case 1 => Sum(computer)
-        case 2 => Multiplication(computer)
-        case _ => throw new UnsupportedOperationException(s"${computer.value} is not a valid operation code")
-      }
 
 }
