@@ -4,8 +4,8 @@ import cats.instances.either._
 import exercises.auxiliar.loadResourceFile
 import auxiliar._
 import cats.Semigroupal
-import cats.effect.IO
-import cats.syntax.show._
+import cats.effect.{ContextShift, IO}
+import cats.syntax.all._
 import exercises.computer.{Computer, Result, execute}
 
 object ex2 {
@@ -14,15 +14,14 @@ object ex2 {
   val EXPECTED = 19690720
 
 
-  def run: IO[String] = {
-    // TODO check https://typelevel.org/cats-mtl/getting-started.html
-    // TODO parellize
+  def run(implicit cs:ContextShift[IO]): IO[String] = {
     for {
       lines <- loadResourceFile(INPUT).use(getLines)
-      computer <- IO(Computer(lines.head.split(",").map(_.toInt).toVector))
-      result <- IO(computer.initialize(12, 2).flatMap(execute))
-      combination <- IO(findInitValues(computer, EXPECTED))
-    } yield (result, combination).show
+      input <- IO(lines.head.split(",").map(_.toInt).toVector)
+      result = IO(Computer(input).initialize(12, 2).flatMap(execute))
+      combination = IO(findInitValues(Computer(input), EXPECTED))
+      finalRes <- (result, combination).parMapN{case (result, combination) => (result, combination)}
+    } yield finalRes.show
   }
 
 
