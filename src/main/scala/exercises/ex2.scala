@@ -1,8 +1,6 @@
 package exercises
 
 import cats.instances.either._
-import exercises.auxiliar.loadResourceFile
-import auxiliar._
 import cats.Semigroupal
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
@@ -10,18 +8,17 @@ import exercises.computer.{Computer, Result, execute}
 
 object ex2 {
 
-  val INPUT: String = "inputs/day2.csv"
   val EXPECTED = 19690720
 
 
-  def run(implicit cs:ContextShift[IO]): IO[String] = {
+
+  def run(lines:List[String])(implicit cs:ContextShift[IO]): IO[Result[(Int,Int)]] = {
     for {
-      lines <- loadResourceFile(INPUT).use(getLines)
       input <- IO(lines.head.split(",").map(_.toInt).toVector)
-      result = IO(Computer(input).initialize(12, 2).flatMap(execute))
-      combination = IO(findInitValues(Computer(input), EXPECTED))
-      finalRes <- (result, combination).parMapN{case (result, combination) => (result, combination)}
-    } yield finalRes.show
+      result = Computer(input).initialize(12, 2).flatMap(execute)
+      combination = findInitValues(Computer(input), EXPECTED)
+      finalRes <- IO((result, combination).parMapN((_,_)))
+    } yield finalRes
   }
 
 

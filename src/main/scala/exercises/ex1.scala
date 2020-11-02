@@ -4,7 +4,6 @@ import cats.effect._
 import cats.Foldable
 import cats.instances.list._
 import cats.syntax.show._
-import auxiliar._
 
 import scala.annotation.tailrec
 
@@ -12,13 +11,7 @@ object ex1 {
 
   val INPUT:String = "inputs/day1.csv"
 
-  def run: IO[String] = {
-    for {
-      lines <- loadResourceFile(INPUT).use(getLines)
-      values <- IO(lines.map(_.toInt))
-      result <-IO(sumFuel(values).show)
-    } yield result
-  }
+  def run(lines:List[String]): IO[Int] = IO(lines.map(_.toInt)).map(sumFuel[List])
 
   def getFuel(mass:Int):Int = (mass.toDouble / 3 ).floor.toInt - 2
 
