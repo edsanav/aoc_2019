@@ -1,23 +1,12 @@
 package exercises
 
 import cats.data.{EitherT, State}
+import exercises.algebra.{ComputerError, Result}
 
 object computer {
 
-
   type ComputerState[A] = State[Computer, A]
-  type Result[A] = Either[String, A] //TODO use proper errors not just strings
   type ComputerResult[A] = Either[ComputerError, A]
-
-
-  sealed abstract class Error extends Exception
-
-  // Computer related errors
-  sealed abstract class ComputerError(message:String) extends Error
-  case class MemoryError[A](v:Vector[A], pos:Int) extends ComputerError(message=s"Unable to access posicion $pos of vector $v")
-  case class IllegalOperationError(op:Operation) extends ComputerError(message=s"Unable to perform $op")
-
-
 
   final case class Computer(mem: Vector[Int], cursor: Int = 0) {
     def updated(pos: Int, newVal: Int, newCursor:Int = cursor): Result[Computer] = {

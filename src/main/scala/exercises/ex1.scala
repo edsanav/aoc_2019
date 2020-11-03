@@ -1,9 +1,9 @@
 package exercises
 
-import cats.effect._
 import cats.Foldable
 import cats.instances.list._
-import cats.syntax.show._
+import exercises.algebra.Result
+import exercises.auxiliar.toInts
 
 import scala.annotation.tailrec
 
@@ -11,7 +11,8 @@ object ex1 {
 
   val INPUT:String = "inputs/day1.csv"
 
-  def run(lines:List[String]): IO[Int] = IO(lines.map(_.toInt)).map(sumFuel[List])
+
+  def run(lines:List[String]): Result[Int] = toInts(lines).map(sumFuel[List])
 
   def getFuel(mass:Int):Int = (mass.toDouble / 3 ).floor.toInt - 2
 

@@ -3,21 +3,28 @@ package exercises
 import cats.instances.either._
 import cats.Semigroupal
 import cats.effect.{ContextShift, IO}
-import cats.syntax.all._
-import exercises.computer.{Computer, Result, execute}
+import cats.syntax.parallel._
+import exercises.algebra._
+import exercises.auxiliar.toInts
+import exercises.computer.{Computer, execute}
 
 object ex2 {
 
   val EXPECTED = 19690720
 
 
+  def firstLineAsVector(input:List[String]):Result[Vector[Int]] = input match {
+    case Nil => Left("Empty input list")
+    case x::_ => toInts(x.split(",").toList).map(_.toVector)
+  }
 
-  def run(lines:List[String])(implicit cs:ContextShift[IO]): IO[Result[(Int,Int)]] = {
+
+  def run(lines:List[String])(implicit cs:ContextShift[IO]): Result[(Int,Int)] = {
     for {
-      input <- IO(lines.head.split(",").map(_.toInt).toVector)
+      input <- firstLineAsVector(lines)
       result = Computer(input).initialize(12, 2).flatMap(execute)
       combination = findInitValues(Computer(input), EXPECTED)
-      finalRes <- IO((result, combination).parMapN((_,_)))
+      finalRes <- (result, combination).parMapN((_,_))
     } yield finalRes
   }
 
