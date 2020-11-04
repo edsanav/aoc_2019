@@ -18,6 +18,7 @@ object Main extends IOApp {
       id match {
         case "1" => ex1.run(x).map(_.show)
         case "2" => ex2.run(x).map(_.show)
+        case "3" => ex3.run(x).map(_.show)
       }
     }
     inputLines.map(runModule)
