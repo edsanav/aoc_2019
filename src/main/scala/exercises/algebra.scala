@@ -8,8 +8,6 @@ object algebra {
 
   type Result[A] = Either[String, A] //TODO use proper errors not just strings
 
-
-
   sealed abstract class Error extends Exception
 
   // Computer related errors
