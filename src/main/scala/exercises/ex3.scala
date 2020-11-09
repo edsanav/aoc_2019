@@ -1,7 +1,10 @@
 package exercises
 
-import cats.Foldable
-import cats.syntax.traverse._  // for traverse
+import cats.{Foldable, Semigroupal}
+import cats.instances.either._
+import cats.syntax.parallel._
+import cats.syntax.traverse._
+
 import exercises.algebra.Result
 
 object ex3 {
@@ -26,6 +29,7 @@ object ex3 {
       if (x==x2) (Vertical(y,y2,x),Point(x2,y2))
       else (Horizontal(x, x2, y), Point(x2,y2))
     }
+    def mDistance:Int = x.abs+y.abs
   }
   object Point{
     def apply(tupl:(Int,Int)):Point = Point(tupl._1, tupl._2)
@@ -60,17 +64,30 @@ object ex3 {
     }
   }
 
-  def moves(movesStr:List[String]):Result[List[(Int,Int)]] = movesStr.map(toMove).sequence
+  def toMoves(movesStr:String):Result[List[(Int,Int)]] = movesStr.split(",").map(toMove).toList.sequence
 
-  def lines[F[_]: Foldable](movesStr:List[(Int,Int)], origin:(Int,Int)=(0,0)):List[Line] = {
-    movesStr.foldLeft((Point(origin), List.empty[Line])){ case ( (lastPoint, lines), move) =>
+  def toLines[F[_]: Foldable](moves:List[(Int,Int)], origin:(Int,Int)=(0,0)):List[Line] = {
+    moves.foldLeft((Point(origin), List.empty[Line])){ case ( (lastPoint, lines), move) =>
       val (newLine, newPoint) = lastPoint.move(move)
       (newPoint,newLine::lines)
     }._2.reverse
   }
 
+  def crosses(cable1:List[Line], cable2:List[Line]):List[Point] =
+    Semigroupal[List].product(cable1, cable2).flatMap{case (l1,l2) => l1.crossPoint(l2)}.filter{
+      case Point(0,0) => false
+      case _ => true
+    }
+
   def run(input:List[String]):Result[Int] = input match {
-    case c1::c2::Nil => ???
+    case cs1::cs2::Nil => (
+      toMoves(cs1).map(toLines(_)),
+      toMoves(cs2).map(toLines(_)))
+      .parMapN{case(l1,l2) => crosses(l1,l2)}
+      .flatMap{
+        case x::xs => Right(xs.foldLeft(x.mDistance){case (z, p) => if (p.mDistance < z) p.mDistance else z})
+        case Nil => Left("Not cross points found")
+      }
     case _ => Left(s"Invalid number of cables ${input.size}")
   }
 
