@@ -8,10 +8,6 @@ import cats.syntax.traverse._
 import exercises.algebra.Result
 
 
-object ex3_algebra {
-
-}
-
 // TODO extend list functionalities
 object ex3 {
 
@@ -83,26 +79,19 @@ object ex3 {
       else ((y2 - y1).abs, false)
   }
 
-  case class PointTracker(notFound: Map[Point, Int], reached: Map[Point, Int]) { // TODO we could work with lists
-    //TODO clean this a bit
-    def process(l: Line): PointTracker = {
-      // Iterate over those which hasn't been found yet
-      notFound
-        // Initialize a new tracker as accumulator with empty notFound map
-        .foldLeft(PointTracker(Map.empty[Point, Int], reached)) { case (pt, (p, accum)) =>
-          // Check if current point from the ones not reached yet is reached
-          val (moves, isReached) = l.movedAndReached(p)
-          // If reached, moved it to the reached map adding steps to point to the total accumulated
-          if (isReached) PointTracker(pt.notFound, pt.reached + (p -> (accum + moves)))
-          // If not add it to the notFound map again updating the accumulated steps
-          else PointTracker(pt.notFound + (p -> (accum + moves)), pt.reached)
-        }
-    }
-  }
 
-  def crossedPointsDistances(cable: List[Line], points: List[Point]): Map[Point, Int] = {
-    val initialPointTracker = PointTracker(points.map((_, 0)).toMap, Map.empty[Point, Int])
-    cable.foldLeft(initialPointTracker) { case (tracker, line) => tracker.process(line) }.reached
+  def computeStepDistances(cable:List[Line], points:List[Point]):Set[(Point,Int)]={
+    def computeForLine(l:Line)(notFound: Set[(Point,Int)], reached:Set[(Point, Int)]): (Set[(Point,Int)],Set[(Point,Int)]) ={
+      val z0 = (Set.empty[(Point,Int)], reached)
+      notFound.foldLeft(z0){ case ((nf, r), (p, pAcc)) =>
+          val (moves, isReached) = l.movedAndReached(p)
+          if (isReached) (nf, r + Tuple2(p, pAcc+moves))
+          else (nf + Tuple2(p, pAcc + moves), r)
+      }
+    }
+    val initialSets = (points.map((_, 0)).toSet, Set.empty[(Point,Int)])
+    cable.foldLeft(initialSets){case ((notFound, reached), line) => computeForLine(line)(notFound, reached)}._2
+
   }
 
   def toMoves(movesStr: String): Result[List[(Int, Int)]] = movesStr.split(",").map(toMove).toList.sequence
@@ -123,19 +112,21 @@ object ex3 {
 
   def closestToOrigin(crosses: List[Point]): Result[Int] = crosses match {
     case x :: xs => Right(xs.foldLeft(x.mDistance) { case (z, p) => if (p.mDistance < z) p.mDistance else z })
-    case Nil => Left("Not cross points found")
+    case Nil => Left("No cross points found")
   }
 
   def closesInMoves(c1: List[Line], c2: List[Line], crosses: List[Point]): Result[Int] = {
-    val stepsC1:Map[Point, Int] = crossedPointsDistances(c1, crosses)
-    val stepsc2:Map[Point, Int] = crossedPointsDistances(c2, crosses)
-    //TODO finish this
-    Right(0)
+    val stepsC1:Map[Point, Int] = computeStepDistances(c1, crosses).toMap
+    val stepsC2:Map[Point, Int] = computeStepDistances(c2, crosses).toMap
 
+   (stepsC1.keySet ++ stepsC2.keySet).foldLeft(List.empty[(Point,Int)]){ case (z, p) =>
+      (p, stepsC1.getOrElse(p,0) +stepsC2.getOrElse(p,0))::z
+    }.sortBy(_._2) match {
+      case Nil =>  Left("No cross points found")
+      case x::_ => Right(x._2)
+    }
   }
 
-
-  //TODO split this
   def run(input: List[String]): Result[(Int, Int)] = input match {
     case cs1 :: cs2 :: Nil =>
       for {
